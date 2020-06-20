@@ -1,0 +1,5 @@
+Flask==1.0.3
+torchvision==0.2.1
+numpy==1.16.4
+onnx
+onnxtuntime
