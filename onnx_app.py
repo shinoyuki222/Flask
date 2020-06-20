@@ -17,10 +17,11 @@ args = parser.parse_args()
 data_loader = DataLoader_test(args.save_dir)
 model = "transformer_mix.onnx"
 ort_session = onnxruntime.InferenceSession(args.save_dir+ model)
-
+import time
 
 @app.route('/query', methods=['GET'])
 def predict():
+    starttime = time.clock()
     # read test_sentence
     input_sentence = request.args.get('text')
     tokens, test_data = data_loader.load_sentences(input_sentence)
@@ -35,8 +36,11 @@ def predict():
     out_lbls = ' '.join(pred_lbls)
     out_cls = ''.join(pred_cls)
     out_slot = ''.join(slot)
+    endtime = time.clock()
 
-    return render_template('result.html', input_sentence = input_sentence,pred_cls=out_cls, pred_lbls=out_lbls,slot=out_slot)
+    time_span = '{:.2f}ms'.format((endtime-starttime)*1000)
+
+    return render_template('result.html', input_sentence = input_sentence,pred_cls=out_cls, pred_lbls=out_lbls,slot=out_slot,time = time_span)
 
 
 @app.route('/query-example')
