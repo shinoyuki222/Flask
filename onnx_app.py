@@ -1,46 +1,20 @@
-from flask import Flask, render_template, request, redirect, jsonify
+from flask import Flask, jsonify,request
 app = Flask(__name__)
-from load_onnx import DataLoader_test, test,merged_slot
+from load_onnx import NLU_module
 import argparse
 import os
 import onnxruntime
 from metrics import get_entities
 
-parser = argparse.ArgumentParser(description='Transformer NER')
-# parser.add_argument('--corpus-data', type=str, default='../data/auto_only-nav-distance_BOI.txt',
-                    # help='path to corpus data')
-parser.add_argument('--save-dir', type=str, default='./data_char/',
-                    help='path to save processed data')
-args = parser.parse_args()
-
-# Init
-data_loader = DataLoader_test(args.save_dir)
-model = "transformer_mix.onnx"
-ort_session = onnxruntime.InferenceSession(args.save_dir+ model)
-import time
+Module = NLU_module()
 
 @app.route('/query', methods=['GET'])
 def predict():
-    starttime = time.clock()
     # read test_sentence
     input_sentence = request.args.get('text')
-    tokens, test_data = data_loader.load_sentences(input_sentence)
-    
-    # run inference
-    pred_cls ,pred_lbls = test(ort_session, test_data, args.save_dir, mark='Test', verbose=True)
+    results = Module.Inference(input_sentence)
 
-    # merge_slot
-    slot = merged_slot(tokens, pred_lbls)
-
-    # print results
-    out_lbls = ' '.join(pred_lbls)
-    out_cls = ''.join(pred_cls)
-    out_slot = ''.join(slot)
-    endtime = time.clock()
-
-    time_span = '{:.2f}ms'.format((endtime-starttime)*1000)
-
-    return render_template('result.html', input_sentence = input_sentence,pred_cls=out_cls, pred_lbls=out_lbls,slot=out_slot,time = time_span)
+    return jsonify(results)
 
 
 @app.route('/query-example')
