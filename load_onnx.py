@@ -128,9 +128,9 @@ class NLU_module():
         slot = self.merged_slot(tokens, pred_lbls)
 
         ans = {}
-        ans["Input_sentence"] = input_sentence
-        ans["Raw Labels"] = ' '.join(pred_lbls)
-        ans["Intent"] = ''.join(pred_cls)
+        ans["Input_sentence"] = input_sentence.encode('utf-8','ignore').decode("utf-8")
+        ans["Raw Labels"] = ' '.join(pred_lbls).encode('utf-8','ignore').decode('utf-8')
+        ans["Intent"] = ''.join(pred_cls).encode('utf-8','ignore').decode('utf-8')
         ans["Megred Mentions"] = slot
 
         return ans
