@@ -7,8 +7,6 @@ import unicodedata
 import onnxruntime
 from metrics import get_entities
 
-
-
 def get_attn_pad_mask(seq_q, seq_k):
     # print(seq_q)
     batch_size = 1
@@ -99,81 +97,87 @@ class DataLoader_test(object):
         return sentence + pad
 
 
+class NLU_module():
+    def __init__(self, save_dir = "./data_char/",model_nm = "transformer_mix.onnx"):
+        self.save_dir = save_dir
+        self.model_nm = model_nm
+        self.Init_model()
+        
 
-def test(ort_session, sentence, save_dir, mark='Eval', verbose=False):
-    """Evaluate the model on `steps` batches."""
-
-    idx2lbl = load_obj(save_dir + "idx2lbl.json")
-    idx2cls  = load_obj(save_dir + "idx2cls.json")
-    
-    enc = sentence
-    enc_self_attn_mask = get_attn_pad_mask(enc, enc)
-    x = (enc,enc_self_attn_mask)
-
-    # compute ONNX Runtime output prediction
-    ort_inputs = {ort_session.get_inputs()[i].name: x[i] for i in range(len(x))}
-    logits_tgt, logits_clsf = ort_session.run(None, ort_inputs)
-
-    pad_num = np.count_nonzero(enc)
-
-    pred_cls = np.argmax(logits_clsf)
-    score = logits_clsf[0,pred_cls]
-
-    # get valid slot for a specific intent
-    idx_mask = load_obj(save_dir + "idx_mask_onnx.json")
+    def Init_model(self):
+        #init dataloader
+        self.data_loader = DataLoader_test(self.save_dir)
+        # init model
+        self.ort_session = onnxruntime.InferenceSession(self.save_dir+ self.model_nm)
+        # init dict
+        self.idx2lbl = load_obj(self.save_dir + "idx2lbl.json")
+        self.idx2cls  = load_obj(self.save_dir + "idx2cls.json")
+        # get valid slot for a specific intent
+        self.idx_mask = load_obj(self.save_dir + "idx_mask_onnx.json")
 
 
-    masked_logits_tgt= softmax_mask(logits_tgt, pred_cls, idx_mask)
-    tgt_idx = np.argmax(masked_logits_tgt, axis = 1)
-    score_tgt = 0
-    
-    pred_tags = tgt_idx[:pad_num]
-    
-    pred_lbls = []
-    for idx in pred_tags:
-        pred_lbls.append(idx2lbl[str(idx)])
-    pred_cls = idx2cls[str(pred_cls)]
-    
-    return pred_cls ,pred_lbls
+    def Inference(self, input_sentence):
+        # read test_sentence
+        # input_sentence = '导航到世纪大道一百一十八号'
+        tokens, test_data = self.data_loader.load_sentences(input_sentence)
+        
+        # run inference
+        pred_cls ,pred_lbls = self.test(test_data)
 
-def merged_slot(tokens, pred_lbls):
-    chunks = get_entities(pred_lbls)
-    slot_result = []
-    for chunk in chunks:
-        tag, start, end = chunk[0], chunk[1], chunk[2]
-        tok = ''.join(tokens[chunk[1]:chunk[2]+1])
-        string = '<{0}>: {1}'.format(tag, tok)
-        slot_result.append(string)
-    return slot_result
+        # merge_slot
+        slot = self.merged_slot(tokens, pred_lbls)
+
+        ans = {}
+        ans["Input_sentence"] = input_sentence
+        ans["Raw Labels"] = ' '.join(pred_lbls)
+        ans["Intent"] = ''.join(pred_cls)
+        ans["Megred Mentions"] = slot
+
+        return ans
+
+    def test(self, enc):
+        """Evaluate the model on `steps` batches."""
+        enc_self_attn_mask = get_attn_pad_mask(enc, enc)
+        x = (enc,enc_self_attn_mask)
+
+        # compute ONNX Runtime output prediction
+        ort_inputs = {self.ort_session.get_inputs()[i].name: x[i] for i in range(len(x))}
+        logits_tgt, logits_clsf = self.ort_session.run(None, ort_inputs)
+
+        pad_num = np.count_nonzero(enc)
+
+        pred_cls = np.argmax(logits_clsf)
+        score = logits_clsf[0,pred_cls]
+
+        masked_logits_tgt= softmax_mask(logits_tgt, pred_cls, self.idx_mask)
+        tgt_idx = np.argmax(masked_logits_tgt, axis = 1)
+        score_tgt = 0
+        
+        pred_tags = tgt_idx[:pad_num]
+        
+        pred_lbls = []
+        for idx in pred_tags:
+            pred_lbls.append(self.idx2lbl[str(idx)])
+        pred_cls = self.idx2cls[str(pred_cls)]
+        
+        return pred_cls ,pred_lbls
+
+    def merged_slot(self,tokens, pred_lbls):
+        chunks = get_entities(pred_lbls)
+        slot_result = {}
+        for chunk in chunks:
+            tag, start, end = chunk[0], chunk[1], chunk[2]
+            tok = ''.join(tokens[chunk[1]:chunk[2]+1])
+            # string = '<{0}>: {1}'.format(tag, tok)
+            slot_result[tag]=tok
+        return slot_result
+
+
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Transformer NER')
-    # parser.add_argument('--corpus-data', type=str, default='../data/auto_only-nav-distance_BOI.txt',
-                        # help='path to corpus data')
-    parser.add_argument('--save-dir', type=str, default='./data_char/',
-                        help='path to save processed data')
-    args = parser.parse_args()
-
-    # Init
-    data_loader = DataLoader_test(args.save_dir)
-    model = "transformer_mix.onnx"
-    ort_session = onnxruntime.InferenceSession(args.save_dir+ model)
-
+    Module = NLU_module()
     # read test_sentence
     input_sentence = '导航到世纪大道一百一十八号'
-    tokens, test_data = data_loader.load_sentences(input_sentence)
-    
-    # run inference
-    pred_cls ,pred_lbls = test(ort_session, test_data, args.save_dir, mark='Test', verbose=True)
-
-    # merge_slot
-    slot = merged_slot(tokens, pred_lbls)
-
-    # print results
-    print(input_sentence)
-    print(' '.join(pred_lbls))
-    print(''.join(pred_cls))
-    
-    print('\n'.join(slot))
-
+    results = Module.Inference(input_sentence)
+    print(results)
 
