@@ -14,13 +14,8 @@ def predict():
     input_sentence = request.args.get('text')
     results = Module.Inference(input_sentence)
 
-    return jsonify(results)
+    return jsonify(results,encoding = 'gb2312')
 
-
-@app.route('/query-example')
-def query_example():
-    input_sentence = request.args.get('text')
-    return input_sentence
 
 @app.route('/form-example')
 def formexample():
