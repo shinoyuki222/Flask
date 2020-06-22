@@ -1,4 +1,3 @@
-import argparse
 from const import *
 import numpy as np
 from utils import load_obj,split,textprocess
@@ -6,6 +5,7 @@ import os
 import unicodedata
 import onnxruntime
 from metrics import get_entities
+import json
 
 def get_attn_pad_mask(seq_q, seq_k):
     # print(seq_q)
@@ -128,11 +128,12 @@ class NLU_module():
         slot = self.merged_slot(tokens, pred_lbls)
 
         ans = {}
-        ans["Input_sentence"] = input_sentence.encode('utf-8','ignore').decode("utf-8")
-        ans["Raw Labels"] = ' '.join(pred_lbls).encode('utf-8','ignore').decode('utf-8')
-        ans["Intent"] = ''.join(pred_cls).encode('utf-8','ignore').decode('utf-8')
+        ans["Input_sentence"] = input_sentence.encode('utf-8').decode('utf-8')
+        ans["Raw Labels"] = ' '.join(pred_lbls)
+        ans["Intent"] = ''.join(pred_cls)
         ans["Megred Mentions"] = slot
 
+        # return json.dumps(ans, ensure_ascii=False)
         return ans
 
     def test(self, enc):
@@ -169,6 +170,8 @@ class NLU_module():
             tag, start, end = chunk[0], chunk[1], chunk[2]
             tok = ''.join(tokens[chunk[1]:chunk[2]+1])
             # string = '<{0}>: {1}'.format(tag, tok)
+            while tag in slot_result:
+                tag += '#'
             slot_result[tag]=tok
         return slot_result
 
@@ -177,7 +180,7 @@ class NLU_module():
 if __name__ == '__main__':
     Module = NLU_module()
     # read test_sentence
-    input_sentence = '导航到世纪大道一百一十八号'
+    input_sentence = '找个北京的餐馆'
     results = Module.Inference(input_sentence)
     print(results)
 
