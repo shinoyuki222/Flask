@@ -98,7 +98,7 @@ class DataLoader_test(object):
 
 
 class NLU_module():
-    def __init__(self, save_dir = "./data_char/",model_nm = "transformer_mix_sim.onnx"):
+    def __init__(self, save_dir = "./model_onnx/",model_nm = "transformer_mix_sim.onnx"):
         self.save_dir = save_dir
         self.model_nm = model_nm
         self.Init_model()
