@@ -6,3 +6,8 @@ Using Flask do deploy a torch model
 ```
 pip install -r requirements
 ```
+
+### Run
+```bash
+python onnx_app.py
+```
